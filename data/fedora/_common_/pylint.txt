@@ -1,0 +1,3 @@
+# Pylint is a linter, typically no system packages needed for runtime itself.
+# It might pull in other Python packages that could have system deps (e.g., astroid).
+# For this example, assuming no direct system deps for pylint core. 

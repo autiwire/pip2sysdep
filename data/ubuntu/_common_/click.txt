@@ -1,0 +1,3 @@
+# Click usually doesn't have system dependencies as it's pure Python
+# This file serves as an example for a common package.
+# No specific system packages typically needed. 
