@@ -25,13 +25,12 @@ __dev__ = [
   "pkg-config"
 ]
 
+# Commands to install, update, upgrade, remove packages
 [__meta__.commands]
 install = "sudo ${package_manager} install -y"
 update = "sudo ${package_manager} update"
 upgrade = "sudo ${package_manager} upgrade -y"
 remove = "sudo ${package_manager} remove -y"
-
-
 
 # Add __docker_host__ to packages that are needed to run docker
 # This will be installed on the host machine, not the container
