@@ -3,12 +3,6 @@ os = "ubuntu"
 version = "24.04"
 package_manager = "apt"
 
-[__meta__.commands]
-install = "sudo ${package_manager} install -y"
-update = "sudo ${package_manager} update"
-upgrade = "sudo ${package_manager} upgrade -y"
-remove = "sudo ${package_manager} remove -y"
-
 # You dont need to add those to packages, they are always installed
 __always__ = [
   "git",
@@ -30,6 +24,14 @@ __dev__ = [
   "build-essential",
   "pkg-config"
 ]
+
+[__meta__.commands]
+install = "sudo ${package_manager} install -y"
+update = "sudo ${package_manager} update"
+upgrade = "sudo ${package_manager} upgrade -y"
+remove = "sudo ${package_manager} remove -y"
+
+
 
 # Add __docker_host__ to packages that are needed to run docker
 # This will be installed on the host machine, not the container

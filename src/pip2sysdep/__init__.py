@@ -74,20 +74,10 @@ class Pip2SysDep:
         result = []
         meta = mapping.get('__meta__', {})
         for item in items:
-            # Debug print
-            # print(f"Expanding item: {item}, mapping keys: {list(mapping.keys())}, meta keys: {list(meta.keys())}")
-            lookup = item
-            # Check for meta-groups in root or __meta__
-            if isinstance(item, str):
-                if not item.startswith('__') and ('__' + item + '__') in mapping and isinstance(mapping['__' + item + '__'], list):
-                    lookup = '__' + item + '__'
-                elif not item.startswith('__') and ('__' + item + '__') in meta and isinstance(meta['__' + item + '__'], list):
-                    lookup = '__' + item + '__'
-                if lookup in mapping and isinstance(mapping[lookup], list):
-                    result.extend(self._expand_deps(mapping, mapping[lookup]))
-                    continue
-                elif lookup in meta and isinstance(meta[lookup], list):
-                    result.extend(self._expand_deps(meta, meta[lookup]))
+            # Expand meta-groups from __meta__ if present
+            if isinstance(item, str) and item.startswith('__') and item.endswith('__'):
+                if item in meta and isinstance(meta[item], list):
+                    result.extend(self._expand_deps({'__meta__': meta}, meta[item]))
                     continue
             result.append(item)
         return result
