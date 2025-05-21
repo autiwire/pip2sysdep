@@ -1,7 +1,4 @@
-from ._helper import _get_current_os_info
-
 import sys
-import urllib.request
 
 if sys.version_info < (3, 11):
     raise RuntimeError("pip2sysdep requires Python 3.11 or newer (for tomllib support)")
@@ -9,9 +6,12 @@ if sys.version_info < (3, 11):
 import enum
 import threading
 import os
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from string import Template
 import tomllib
+import platform
+import urllib.request
+
 
 # Define the different sources pip2sysdep lists can be retrieved from
 class SysDepSource(enum.Enum):
@@ -32,7 +32,7 @@ class Pip2SysDep:
 
         # If OS info not provided, try to detect it
         if os_distro is None or os_version is None:
-            detected_distro, detected_version = _get_current_os_info()
+            detected_distro, detected_version = self._get_current_os_info()
             self.os_distro = os_distro or detected_distro
             self.os_version = os_version or detected_version
         else:
@@ -69,6 +69,40 @@ class Pip2SysDep:
                 elif self.source == SysDepSource.REPO:
                     self._content = self._get_repo_content()
         return self._content
+
+    def _get_current_os_info(self) -> Tuple[str, str]:
+        """
+        Get the current OS distribution and version.
+        
+        Returns:
+            Tuple of (distribution_name, version)
+        """
+        # Try to get OS info from /etc/os-release first
+        if os.path.exists("/etc/os-release"):
+            with open("/etc/os-release") as f:
+                lines = f.readlines()
+                info = dict(line.strip().split("=", 1) for line in lines if "=" in line)
+                
+                # Remove quotes if present
+                distro = info.get("ID", "").strip('"')
+                version = info.get("VERSION_ID", "").strip('"')
+                
+                if distro and version:
+                    return distro.lower(), version
+
+        # Fallback to platform module
+        system = platform.system().lower()
+        if system == "linux":
+            # Try to detect common distributions
+            if os.path.exists("/etc/debian_version"):
+                with open("/etc/debian_version") as f:
+                    return "debian", f.read().strip()
+            elif os.path.exists("/etc/redhat-release"):
+                with open("/etc/redhat-release") as f:
+                    return "rhel", f.read().split()[6].split('.')[0]
+        
+        # Default fallback
+        return platform.system().lower(), platform.release()
 
     def _expand_deps(self, mapping, items):
         result = []

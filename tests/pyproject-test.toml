@@ -1,0 +1,32 @@
+[project]
+dependencies = [
+    "numpy",
+    "requests",
+    "pandas==1.5.3",
+    "scipy>=1.10",
+    "uvicorn[standard]",
+    "pytest; python_version < '3.12'",
+    "git+https://github.com/example/repo.git",
+    "-e git+ssh://git@github.com:example/repo.git#egg=example",
+    "https://github.com/example/another-repo/archive/refs/heads/main.zip",
+    "-e ./local_package",
+    "../relative_package",
+    "/absolute/path/to/package"
+]
+
+[tool.poetry.dependencies]
+numpy = "*"
+requests = "*"
+pandas = "1.5.3"
+scipy = ">=1.10"
+uvicorn = {extras = ["standard"], version = "*"}
+pytest = {version = "*", markers = "python_version < '3.12'"}
+python = ">=3.8"
+
+[tool.pdm.dependencies]
+numpy = "*"
+requests = "*"
+pandas = "1.5.3"
+scipy = ">=1.10"
+uvicorn = "*"
+pytest = "*" 

@@ -1,0 +1,29 @@
+# requirements-test.txt for pip2sysdep CLI testing
+
+# Standard packages
+numpy
+requests
+
+# With version specifiers
+pandas==1.5.3
+scipy>=1.10
+
+# With extras
+uvicorn[standard]
+
+# With environment markers
+pytest; python_version < "3.12"
+
+# VCS/URL installs (should be ignored)
+git+https://github.com/example/repo.git
+-e git+ssh://git@github.com:example/repo.git#egg=example
+https://github.com/example/another-repo/archive/refs/heads/main.zip
+
+# Local path (should be ignored)
+-e ./local_package
+../relative_package
+/absolute/path/to/package
+
+# Blank line below
+
+# End of file 
