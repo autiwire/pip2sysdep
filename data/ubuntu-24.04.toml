@@ -59,6 +59,4 @@ deps = [
   "__dev__",
   "libldap2-dev",
   "libsasl2-dev",
-  "libldap-2.5-0",
-  "libsasl2-2"
 ]
