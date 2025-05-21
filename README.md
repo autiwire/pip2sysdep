@@ -1,5 +1,10 @@
 # pip2sysdep
 
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/github/license/autiwire/pip2sysdep)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/autiwire/pip2sysdep/ci.yml?branch=main)
+![Last Commit](https://img.shields.io/github/last-commit/autiwire/pip2sysdep)
+
 **pip2sysdep** is a command-line tool that maps Python package requirements to the system-level packages needed for successful `pip install` in a virtual environment. It helps you quickly determine and install the necessary OS packages for your Python dependencies, supporting both local and online mapping sources.
 
 ## Features
@@ -21,8 +26,10 @@ Clone this repository and install the dependencies (if any):
 # (Optional) Create a virtual environment
  python3 -m venv .venv
  source .venv/bin/activate
-# Install any required dependencies (if needed)
- pip install -r requirements.txt
+# Run as module in venv
+ python3 -m pip2sysdep 
+# Run as script
+ python3 src/pip2sysdep.py
 ```
 
 ## Usage
@@ -70,6 +77,28 @@ python3 -m pip2sysdep numpy requests --separator=space
 ### Run the system install command automatically
 ```bash
 python3 -m pip2sysdep numpy requests --install
+```
+
+## Example Output
+
+```bash
+$ python3 -m pip2sysdep bonsai
+git
+curl
+wget
+python3
+python3-pip
+python3-setuptools
+python3-wheel
+python3-venv
+python3-dev
+gcc
+g++
+make
+build-essential
+pkg-config
+libldap2-dev
+libsasl2-dev
 ```
 
 ## Options
