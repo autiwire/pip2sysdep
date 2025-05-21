@@ -124,4 +124,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 This project is maintained by [AutiWire GmbH](https://autiwire.de).
 
-Copyright (c) 2024 AutiWire GmbH
+Copyright (c) 2025 AutiWire GmbH
