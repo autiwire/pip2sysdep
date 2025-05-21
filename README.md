@@ -32,6 +32,28 @@ Clone this repository and install the dependencies (if any):
  python3 src/pip2sysdep.py
 ```
 
+## Example Output
+
+```bash
+$ python3 -m pip2sysdep bonsai
+git
+curl
+wget
+python3
+python3-pip
+python3-setuptools
+python3-wheel
+python3-venv
+python3-dev
+gcc
+g++
+make
+build-essential
+pkg-config
+libldap2-dev
+libsasl2-dev
+```
+
 ## Usage
 
 ### Basic usage (online mapping by default)
@@ -77,28 +99,6 @@ python3 -m pip2sysdep numpy requests --separator=space
 ### Run the system install command automatically
 ```bash
 python3 -m pip2sysdep numpy requests --install
-```
-
-## Example Output
-
-```bash
-$ python3 -m pip2sysdep bonsai
-git
-curl
-wget
-python3
-python3-pip
-python3-setuptools
-python3-wheel
-python3-venv
-python3-dev
-gcc
-g++
-make
-build-essential
-pkg-config
-libldap2-dev
-libsasl2-dev
 ```
 
 ## Options
