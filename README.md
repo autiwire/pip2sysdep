@@ -119,3 +119,7 @@ Contributions, bug reports, and feature requests are welcome! Please open an iss
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
+
+## About
+
+This project is maintained by [AutiWire GmbH](https://autiwire.de).
