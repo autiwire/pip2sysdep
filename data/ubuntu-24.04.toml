@@ -1,0 +1,58 @@
+[__meta__]
+os = "ubuntu"
+version = "24.04"
+package_manager = "apt"
+install_command = "${package_manager} install -y"
+
+# You dont need to add those to packages, they are always installed
+__always__ = [
+  "git",
+  "curl",
+  "wget",
+  "python3",
+  "python3-pip",
+  "python3-setuptools",
+  "python3-wheel",
+  "python3-venv"
+]
+
+# Add __dev__ to packages that need to be compiled
+__dev__ = [
+  "python3-dev",
+  "gcc",
+  "g++",
+  "make",
+  "build-essential",
+  "pkg-config"
+]
+
+# Add __docker_host__ to packages that are needed to run docker
+# This will be installed on the host machine, not the container
+__docker_host__ = [
+  "docker.io",
+  "docker-compose",
+  "docker-doc"
+]
+
+
+#                                           #
+# *** PACKAGES MAPPING FOR UBUNTU 24.04 *** #
+#                                           #
+
+[numpy]
+deps = [
+  "__dev__",
+  "libopenblas-dev",
+  "liblapack-dev",
+  "libopenblas0",
+  "liblapack3"
+] 
+
+[bonsai] # ldap library
+deps = [
+  "__dev__",
+  "libldap2-dev",
+  "libsasl2-dev",
+  "libldap-2.5-0",
+  "libsasl2-2"
+]

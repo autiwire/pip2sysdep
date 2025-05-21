@@ -6,6 +6,11 @@ import yaml
 import os
 from typing import Dict, List, Optional, Set
 from string import Template
+import sys
+
+if sys.version_info < (3, 11):
+    raise RuntimeError("pip2sysdep requires Python 3.11 or newer (for tomllib support)")
+import tomllib
 
 # Define the different sources pip2sysdep lists can be retrieved from
 class Source(enum.Enum):
@@ -38,19 +43,13 @@ class Pip2SysDep:
 
     def _get_local_content(self) -> Dict:
         """Get content from local files."""
-        # 1. Check external/pip2sysdep/data/
+        # Look for TOML mapping in external/pip2sysdep/data/
         external_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
-        mapping_file = os.path.join(external_data_dir, f"{self.os_distro}-{self.os_version}.yaml")
+        mapping_file = os.path.join(external_data_dir, f"{self.os_distro}-{self.os_version}.toml")
         if os.path.exists(mapping_file):
-            with open(mapping_file, 'r') as f:
-                return yaml.safe_load(f)
-        # 2. Fallback to package data dir (src/pip2sysdep/data/)
-        package_data_dir = os.path.join(os.path.dirname(__file__), "data")
-        mapping_file = os.path.join(package_data_dir, f"{self.os_distro}-{self.os_version}.yaml")
-        if os.path.exists(mapping_file):
-            with open(mapping_file, 'r') as f:
-                return yaml.safe_load(f)
-        raise FileNotFoundError(f"Mapping file not found in external or package data dirs for {self.os_distro}-{self.os_version}")
+            with open(mapping_file, 'rb') as f:
+                return tomllib.load(f)
+        raise FileNotFoundError(f"Mapping file not found: {mapping_file}")
 
     def _get_repo_content(self) -> Dict:
         """Get content from remote repository."""
@@ -66,47 +65,44 @@ class Pip2SysDep:
                     self._content = self._get_repo_content()
         return self._content
 
-    def convert(self, pip_package: str, dependency_types: Optional[List[DependencyType]] = None) -> Dict[str, List[str]]:
-        """
-        Convert a single pip requirement to its system dependencies.
-
-        Args:
-            pip_package (str): The pip package name to convert
-            dependency_types (List[DependencyType], optional): List of dependency types to include.
-                If None, all dependency types are included.
-
-        Returns:
-            Dict[str, List[str]]: Dictionary mapping dependency types to lists of system packages
-        """
-        content = self._get_content()
-        result = {}
-
-        # If no specific types requested, include all
-        if dependency_types is None:
-            dependency_types = list(DependencyType)
-
-        # Get package mappings
-        pkg_deps = content.get(pip_package, {})
-
-        # Always include all items for each dependency type
-        for dep_type in dependency_types:
-            key = dep_type.value
-            items = []
-            # Add global (underscore-prefixed) items if present
-            if key == "build_essentials" and "_build_essentials" in content:
-                items.extend(content["_build_essentials"])
-            if key == "python_deps" and "_python_dev" in content:
-                items.extend(content["_python_dev"])
-            # Add package-specific items if present
-            if key in pkg_deps:
-                items.extend(pkg_deps[key])
-            # Remove duplicates while preserving order
-            if items:
-                result[key] = list(dict.fromkeys(items))
-
+    def _expand_deps(self, mapping, items):
+        result = []
+        meta = mapping.get('__meta__', {})
+        for item in items:
+            # Debug print
+            # print(f"Expanding item: {item}, mapping keys: {list(mapping.keys())}, meta keys: {list(meta.keys())}")
+            lookup = item
+            # Check for meta-groups in root or __meta__
+            if isinstance(item, str):
+                if not item.startswith('__') and ('__' + item + '__') in mapping and isinstance(mapping['__' + item + '__'], list):
+                    lookup = '__' + item + '__'
+                elif not item.startswith('__') and ('__' + item + '__') in meta and isinstance(meta['__' + item + '__'], list):
+                    lookup = '__' + item + '__'
+                if lookup in mapping and isinstance(mapping[lookup], list):
+                    result.extend(self._expand_deps(mapping, mapping[lookup]))
+                    continue
+                elif lookup in meta and isinstance(meta[lookup], list):
+                    result.extend(self._expand_deps(meta, meta[lookup]))
+                    continue
+            result.append(item)
         return result
 
-    def convert_list(self, pip_packages: List[str], dependency_types: Optional[List[DependencyType]] = None) -> Dict[str, Set[str]]:
+    def convert(self, pip_package: str) -> Dict[str, list]:
+        content = self._get_content()
+        meta = content.get('__meta__', {})
+        result = []
+        # Always start with __always__ if present
+        if '__always__' in meta:
+            result.extend(self._expand_deps({'__meta__': meta}, meta['__always__']))
+        # Add package-specific deps
+        pkg_deps = content.get(pip_package, {}).get('deps', [])
+        result.extend(self._expand_deps({'__meta__': meta}, pkg_deps))
+        # Remove duplicates while preserving order
+        seen = set()
+        flat = [x for x in result if not (x in seen or seen.add(x))]
+        return {'all': flat}
+
+    def convert_list(self, pip_packages: List[str], dependency_types: Optional[List[DependencyType]] = None) -> Dict[str, list]:
         """
         Convert a list of pip requirements to their system dependencies.
 
@@ -116,21 +112,27 @@ class Pip2SysDep:
                 If None, all dependency types are included.
 
         Returns:
-            Dict[str, Set[str]]: Dictionary mapping dependency types to sets of unique system packages
+            Dict[str, list]: Dictionary mapping dependency types to sets of unique system packages, and 'all' to a deduped, order-preserving list
         """
-        result: Dict[str, Set[str]] = {}
-        
+        result: Dict[str, set] = {}
+        all_flat = []
+        seen = set()
         # Process each package
         for pkg in pip_packages:
-            pkg_deps = self.convert(pkg, dependency_types)
-            
-            # Merge dependencies by type
+            pkg_deps = self.convert(pkg)
             for dep_type, deps in pkg_deps.items():
                 if dep_type not in result:
                     result[dep_type] = set()
                 result[dep_type].update(deps)
-        
-        return result
+                # For 'all', preserve order and dedupe
+                for dep in deps:
+                    if dep not in seen:
+                        all_flat.append(dep)
+                        seen.add(dep)
+        # Convert all sets to sets except 'all', which is a list
+        out = {k: v for k, v in result.items()}
+        out['all'] = all_flat
+        return out
 
     def get_install_command(self, dependencies: Dict[str, Set[str]]) -> str:
         """
@@ -143,8 +145,8 @@ class Pip2SysDep:
             str: The package manager install command
         """
         content = self._get_content()
-        meta = content.get("_meta", {})
-        install_cmd = meta.get("commands", {}).get("install", "apt install -y")
+        meta = content.get("__meta__", {})
+        install_cmd = meta.get("install_command", "apt install -y")
         
         # Interpolate package manager command
         if "${package_manager}" in install_cmd:

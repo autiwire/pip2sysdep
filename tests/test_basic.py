@@ -1,8 +1,8 @@
 import pytest
 from pathlib import Path
 import os
-import yaml
 import builtins
+import tomllib
 
 from pip2sysdep import Pip2SysDep, Source, DependencyType
 
@@ -12,54 +12,37 @@ def test_data_dir(tmp_path, monkeypatch):
     """Create a temporary directory with test mapping files and patch Pip2SysDep to use it."""
     data_dir = tmp_path / "data"
     data_dir.mkdir(exist_ok=True)
-    
-    mapping_data = {
-        "_meta": {
-            "os": "ubuntu",
-            "version": "24.04",
-            "package_manager": "apt",
-            "commands": {
-                "install": "${package_manager} install -y"
-            }
-        },
-        "_build_essentials": [
-            "build-essential",
-            "gcc",
-            "g++",
-            "make",
-            "pkg-config"
-        ],
-        "_python_dev": [
-            "python3-dev",
-            "python3-pip",
-            "python3-setuptools",
-            "python3-wheel",
-            "python3-venv"
-        ],
-        "numpy": {
-            "build_essentials": ["build-essential"],
-            "dev_headers": ["libopenblas-dev", "liblapack-dev"],
-            "system_libs": ["libopenblas0", "liblapack3"]
-        },
-        "python-ldap": {
-            "dev_headers": ["libldap2-dev", "libsasl2-dev"],
-            "system_libs": ["libldap-2.5-0", "libsasl2-2"]
-        },
-        "requests": {
-            "system_libs": ["ca-certificates"]
-        }
-    }
-    
+
+    # TOML mapping as a string (no toml dependency)
+    mapping_toml = '''
+[__meta__]
+__always__ = [
+    "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv"
+]
+__dev__ = [
+    "build-essential", "gcc", "g++", "make", "pkg-config", "python3-dev"
+]
+
+[numpy]
+deps = ["__dev__", "libopenblas-dev", "liblapack-dev", "libopenblas0", "liblapack3"]
+
+["python-ldap"]
+deps = ["__dev__", "libldap2-dev", "libsasl2-dev", "libldap-2.5-0", "libsasl2-2"]
+
+[requests]
+deps = []
+'''
+
     for distro, version in [("debian", "12"), ("ubuntu", "24.04"), ("fedora", "38")]:
-        yaml_path = data_dir / f"{distro}-{version}.yaml"
-        with open(yaml_path, "w") as f:
-            yaml.dump(mapping_data, f, sort_keys=False)
-    
+        toml_path = data_dir / f"{distro}-{version}.toml"
+        with open(toml_path, "w") as f:
+            f.write(mapping_toml)
+
     # Patch Pip2SysDep to always load from this temp data dir
     def _get_local_content(self):
-        mapping_file = data_dir / f"{self.os_distro}-{self.os_version}.yaml"
-        with open(mapping_file, 'r') as f:
-            return yaml.safe_load(f)
+        mapping_file = data_dir / f"{self.os_distro}-{self.os_version}.toml"
+        with open(mapping_file, 'rb') as f:
+            return tomllib.load(f)
     monkeypatch.setattr("pip2sysdep.Pip2SysDep._get_local_content", _get_local_content)
     return data_dir
 
@@ -94,52 +77,31 @@ def test_convert_single_package(test_data_dir, monkeypatch):
     monkeypatch.syspath_prepend(test_data_dir.parent)
     
     converter = Pip2SysDep(
-        source=Source.LOCAL,
-        os_distro="debian",
-        os_version="12"
+        os_distro="ubuntu",
+        os_version="24.04"
     )
     
     # Test package with multiple dependency types
-    numpy_deps = converter.convert("numpy")
-    print("Loaded YAML:", converter._get_content())
-    print("numpy_deps:", numpy_deps)
-    assert numpy_deps["build_essentials"] == ["build-essential", "gcc", "g++", "make", "pkg-config"]
-    assert numpy_deps["dev_headers"] == ["libopenblas-dev", "liblapack-dev"]
-    assert numpy_deps["system_libs"] == ["libopenblas0", "liblapack3"]
+    numpy_deps = converter.convert("numpy")['all']
+    expected_numpy = [
+        "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv",
+        "build-essential", "gcc", "g++", "make", "pkg-config", "python3-dev",
+        "libopenblas-dev", "liblapack-dev", "libopenblas0", "liblapack3"
+    ]
+    assert numpy_deps == expected_numpy
     
-    # Test package with only system libraries
-    requests_deps = converter.convert("requests")
-    assert requests_deps["system_libs"] == ["ca-certificates"]
-    assert requests_deps["build_essentials"] == ["build-essential", "gcc", "g++", "make", "pkg-config"]
-    assert requests_deps["python_deps"] == ["python3-dev", "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv"]
-    assert "dev_headers" not in requests_deps
+    # Test package with only system libraries (requests has no extra deps)
+    requests_deps = converter.convert("requests")['all']
+    expected_requests = [
+        "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv"
+    ]
+    assert requests_deps == expected_requests
     
     # Test unknown package
-    nonexistent_deps = converter.convert("nonexistent")
-    assert nonexistent_deps["build_essentials"] == ["build-essential", "gcc", "g++", "make", "pkg-config"]
-    assert nonexistent_deps["python_deps"] == ["python3-dev", "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv"]
-    assert "dev_headers" not in nonexistent_deps
-    assert "system_libs" not in nonexistent_deps
-
-def test_convert_with_specific_types(test_data_dir, monkeypatch):
-    """Test converting a package with specific dependency types."""
-    monkeypatch.syspath_prepend(test_data_dir.parent)
-    
-    converter = Pip2SysDep(
-        source=Source.LOCAL,
-        os_distro="debian",
-        os_version="12"
-    )
-    
-    # Test getting only system libraries
-    numpy_sys_libs = converter.convert("numpy", [DependencyType.SYSTEM_LIBS])
-    assert numpy_sys_libs == {"system_libs": ["libopenblas0", "liblapack3"]}
-    
-    # Test getting build and dev dependencies
-    numpy_build_dev = converter.convert("numpy", [DependencyType.BUILD_ESSENTIALS, DependencyType.DEV_HEADERS])
-    assert numpy_build_dev["build_essentials"] == ["build-essential", "gcc", "g++", "make", "pkg-config"]
-    assert numpy_build_dev["dev_headers"] == ["libopenblas-dev", "liblapack-dev"]
-    assert "system_libs" not in numpy_build_dev
+    nonexistent_deps = converter.convert("nonexistent")['all']
+    assert nonexistent_deps == [
+        "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv"
+    ]
 
 def test_convert_package_list(test_data_dir, monkeypatch):
     """Test converting a list of packages."""
@@ -153,22 +115,16 @@ def test_convert_package_list(test_data_dir, monkeypatch):
     
     packages = ["numpy", "python-ldap", "requests"]
     deps = converter.convert_list(packages)
+    all_deps = deps['all']
     
-    # Check build essentials
-    assert deps["build_essentials"] == {"build-essential", "gcc", "g++", "make", "pkg-config"}
-    
-    # Check dev headers
-    assert deps["dev_headers"] == {
-        "libopenblas-dev", "liblapack-dev",
-        "libldap2-dev", "libsasl2-dev"
-    }
-    
-    # Check system libraries
-    assert deps["system_libs"] == {
-        "libopenblas0", "liblapack3",
-        "libldap-2.5-0", "libsasl2-2",
-        "ca-certificates"
-    }
+    # Check for presence of expected packages
+    for pkg in [
+        "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv",
+        "build-essential", "gcc", "g++", "make", "pkg-config", "python3-dev",
+        "libopenblas-dev", "liblapack-dev", "libopenblas0", "liblapack3",
+        "libldap2-dev", "libsasl2-dev", "libldap-2.5-0", "libsasl2-2"
+    ]:
+        assert pkg in all_deps
 
 def test_get_install_command(test_data_dir, monkeypatch):
     """Test generating install commands."""
@@ -182,19 +138,14 @@ def test_get_install_command(test_data_dir, monkeypatch):
     
     # Get dependencies
     deps = converter.convert_list(["numpy", "python-ldap"])
+    all_deps = deps['all']
     
     # Get install command
     cmd = converter.get_install_command(deps)
     
     # Command should include all dependencies
     assert cmd.startswith("apt install -y")
-    for pkg in [
-        "build-essential", "gcc", "g++", "make", "pkg-config",
-        "libopenblas-dev", "liblapack-dev",
-        "libldap2-dev", "libsasl2-dev",
-        "libopenblas0", "liblapack3",
-        "libldap-2.5-0", "libsasl2-2"
-    ]:
+    for pkg in all_deps:
         assert pkg in cmd
 
 def test_thread_safety(test_data_dir, monkeypatch):
@@ -227,9 +178,13 @@ def test_thread_safety(test_data_dir, monkeypatch):
     
     # All results should be identical
     assert all(r == results[0] for r in results)
-    assert "build_essentials" in results[0]
-    assert "dev_headers" in results[0]
-    assert "system_libs" in results[0]
+    all_deps = results[0]['all']
+    for pkg in [
+        "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv",
+        "build-essential", "gcc", "g++", "make", "pkg-config", "python3-dev",
+        "libopenblas-dev", "liblapack-dev", "libopenblas0", "liblapack3"
+    ]:
+        assert pkg in all_deps
 
 def test_error_handling():
     """Test error handling for various scenarios."""
@@ -261,7 +216,63 @@ def test_different_distros(test_data_dir, monkeypatch):
         )
         
         # Each distro should handle the conversion
-        deps = converter.convert("numpy")
-        assert "build_essentials" in deps
-        assert "dev_headers" in deps
-        assert "system_libs" in deps
+        deps = converter.convert("numpy")['all']
+        for pkg in [
+            "python3-pip", "python3-setuptools", "python3-wheel", "python3-venv",
+            "build-essential", "gcc", "g++", "make", "pkg-config", "python3-dev",
+            "libopenblas-dev", "liblapack-dev", "libopenblas0", "liblapack3"
+        ]:
+            assert pkg in deps
+
+def test_meta_group_expansion(monkeypatch):
+    # Patch _get_local_content to provide a minimal TOML-like dict for testing
+    def fake_content(self):
+        return {
+            "__meta__": {
+                "__always__": ["foo", "bar"],
+                "__dev__": ["baz", "qux"]
+            },
+            "somepkg": {"deps": ["__dev__", "libx", "liby"]},
+            "otherpkg": {"deps": ["libz"]}
+        }
+    monkeypatch.setattr(Pip2SysDep, "_get_local_content", fake_content)
+    converter = Pip2SysDep(os_distro="testos", os_version="1.0")
+    # Package with meta-group expansion
+    deps = converter.convert("somepkg")['all']
+    assert deps == ["foo", "bar", "baz", "qux", "libx", "liby"]
+    # Package with only package-specific deps
+    deps2 = converter.convert("otherpkg")['all']
+    assert deps2 == ["foo", "bar", "libz"]
+    # Unknown package, should get only __always__
+    deps3 = converter.convert("nonexistent")['all']
+    assert deps3 == ["foo", "bar"]
+
+def test_recursive_meta_group(monkeypatch):
+    def fake_content(self):
+        return {
+            "__meta__": {
+                "__always__": ["foo"],
+                "__dev__": ["bar", "__build__"],
+                "__build__": ["baz"]
+            },
+            "pkg": {"deps": ["__dev__", "libx"]}
+        }
+    monkeypatch.setattr(Pip2SysDep, "_get_local_content", fake_content)
+    converter = Pip2SysDep(os_distro="testos", os_version="1.0")
+    deps = converter.convert("pkg")['all']
+    assert deps == ["foo", "bar", "baz", "libx"]
+
+def test_duplicate_removal(monkeypatch):
+    def fake_content(self):
+        return {
+            "__meta__": {
+                "__always__": ["foo", "bar"],
+                "__dev__": ["bar", "baz"]
+            },
+            "pkg": {"deps": ["__dev__", "foo", "baz"]}
+        }
+    monkeypatch.setattr(Pip2SysDep, "_get_local_content", fake_content)
+    converter = Pip2SysDep(os_distro="testos", os_version="1.0")
+    deps = converter.convert("pkg")['all']
+    # Should not have duplicates
+    assert deps == ["foo", "bar", "baz"]

@@ -1,5 +1,0 @@
-# Ubuntu 22.04 (Jammy) package mappings
-numpy: ["python3-numpy", "python3-dev"]
-pandas: ["python3-pandas"]
-requests: ["python3-requests", "ca-certificates"]
-tensorflow: ["python3-tensorflow", "cuda-toolkit"] 

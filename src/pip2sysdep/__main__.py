@@ -1,8 +1,14 @@
+import sys
 from . import Pip2SysDep
-from . import DependencyType
+
 def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 -m pip2sysdep <pip-package> [<pip-package> ...]", file=sys.stderr)
+        sys.exit(1)
+    packages = sys.argv[1:]
     converter = Pip2SysDep()
-    print(converter.convert("numpy", [DependencyType.BUILD_ESSENTIALS, DependencyType.DEV_HEADERS]))
+    result = converter.convert_list(packages)
+    print(" ".join(result['all']))
 
 if __name__ == "__main__":
     main()
