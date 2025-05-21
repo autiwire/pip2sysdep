@@ -1,0 +1,48 @@
+"""
+
+Ubuntu 24.04 LTS
+
+Mapping of pip packages to ubuntu packages (requirements for installation of pip packages)
+
+Syntax:
+
+<pip_package>:
+  - <ubuntu_package>
+  - <ubuntu_package>
+  - ...
+
+
+"""
+
+_meta:
+  os: ubuntu
+  version: 24.04
+  package_manager: apt
+  commands:
+    update: ${package_manager} update
+    install: ${package_manager} install -y
+    upgrade: ${package_manager} upgrade -y
+    remove: ${package_manager} remove -y
+    autoremove: ${package_manager} autoremove -y
+    clean: ${package_manager} clean
+
+# Default dependencies which are always installed
+_default_deps:
+  - curl
+  - git
+  - python3-pip
+  - python3-setuptools
+  - python3-wheel
+  - python3-venv
+
+# Container host dependencies
+# Everything that is needed to run the container host in docker compose
+_container_host_deps:
+  - docker
+  - docker-compose
+
+fire:
+  - python3-fire
+
+pydantic:
+  - python3-pydantic

@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools-scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pip2sysdep"
+version = "0.1.0"
+description = "A tool to convert Python pip requirements to system dependencies"
+authors = [
+    {name = "Rouven Raudzus", email = "raudzus@autiwire.org"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "NoLicense"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "packaging>=23.0",
+    "fire>=0.7.0",    
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "requests>=2.0",
+    "docker>=6.0",
+    "docker-compose>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "isort>=5.0",
+    "mypy>=1.0",
+    "pylint>=2.17"
+]
+
+[project.scripts]
+pip2sysdep = "pip2sysdep.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["pip2sysdep"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0111",  # missing-docstring
+    "R0903",  # too-few-public-methods
+    "C0103",  # invalid-name
+]
+
+[tool.pylint.format]
+max-line-length = 100 
