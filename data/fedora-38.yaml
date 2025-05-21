@@ -1,0 +1,5 @@
+# Fedora 38 package mappings
+numpy: ["python3-numpy", "python3-devel"]
+pandas: ["python3-pandas"]
+requests: ["python3-requests", "ca-certificates"]
+tensorflow: ["python3-tensorflow", "cuda"] 

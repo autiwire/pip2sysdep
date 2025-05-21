@@ -1,48 +1,28 @@
-"""
-
-Ubuntu 24.04 LTS
-
-Mapping of pip packages to ubuntu packages (requirements for installation of pip packages)
-
-Syntax:
-
-<pip_package>:
-  - <ubuntu_package>
-  - <ubuntu_package>
-  - ...
-
-
-"""
-
 _meta:
   os: ubuntu
-  version: 24.04
+  version: "24.04"
   package_manager: apt
   commands:
-    update: ${package_manager} update
-    install: ${package_manager} install -y
-    upgrade: ${package_manager} upgrade -y
-    remove: ${package_manager} remove -y
-    autoremove: ${package_manager} autoremove -y
-    clean: ${package_manager} clean
+    install: "${package_manager} install -y"
 
-# Default dependencies which are always installed
-_default_deps:
-  - curl
-  - git
+# Default build dependencies which are commonly needed
+_build_essentials:
+  - build-essential
+  - gcc
+  - g++
+  - make
+  - pkg-config
+
+# Default Python development dependencies
+_python_dev:
+  - python3-dev
   - python3-pip
   - python3-setuptools
   - python3-wheel
   - python3-venv
 
-# Container host dependencies
-# Everything that is needed to run the container host in docker compose
-_container_host_deps:
-  - docker
-  - docker-compose
-
-fire:
-  - python3-fire
-
-pydantic:
-  - python3-pydantic
+# Example mappings for common packages that need system dependencies
+numpy:
+  build_essentials: [build-essential]
+  dev_headers: [libopenblas-dev, liblapack-dev]
+  system_libs: [libopenblas0, liblapack3]
