@@ -2,7 +2,12 @@
 os = "ubuntu"
 version = "24.04"
 package_manager = "apt"
-install_command = "${package_manager} install -y"
+
+[__meta__.commands]
+install = "sudo ${package_manager} install -y"
+update = "sudo ${package_manager} update"
+upgrade = "sudo ${package_manager} upgrade -y"
+remove = "sudo ${package_manager} remove -y"
 
 # You dont need to add those to packages, they are always installed
 __always__ = [

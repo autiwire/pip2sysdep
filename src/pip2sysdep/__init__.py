@@ -1,33 +1,31 @@
 from ._helper import _get_current_os_info
 
-import enum
-import threading
-import yaml
-import os
-from typing import Dict, List, Optional, Set
-from string import Template
 import sys
+import urllib.request
 
 if sys.version_info < (3, 11):
     raise RuntimeError("pip2sysdep requires Python 3.11 or newer (for tomllib support)")
+
+import enum
+import threading
+import os
+from typing import Dict, List, Optional, Set
+from string import Template
 import tomllib
 
 # Define the different sources pip2sysdep lists can be retrieved from
-class Source(enum.Enum):
+class SysDepSource(enum.Enum):
     LOCAL = "local" # Searches for a local yaml file in pip2sysdep/data/
     REPO = "repo" # Searches for a yaml file in the online repository
-
-class DependencyType(enum.Enum):
-    BUILD_ESSENTIALS = "build_essentials"
-    DEV_HEADERS = "dev_headers"
-    SYSTEM_LIBS = "system_libs"
-    PYTHON_DEPS = "python_deps"
-
+   
 class Pip2SysDep:
     """
     Convert pip package requirements to system-level dependencies.
     """
-    def __init__(self, source: Source = Source.LOCAL, os_distro: Optional[str] = None, os_version: Optional[str] = None):
+
+    Source = SysDepSource
+
+    def __init__(self, source: SysDepSource = SysDepSource.LOCAL, os_distro: Optional[str] = None, os_version: Optional[str] = None):
         self.source = source
         self._content = None
         self._content_lock = threading.Lock()
@@ -52,16 +50,23 @@ class Pip2SysDep:
         raise FileNotFoundError(f"Mapping file not found: {mapping_file}")
 
     def _get_repo_content(self) -> Dict:
-        """Get content from remote repository."""
-        raise NotImplementedError("Repository source not yet implemented")
+        """Get content from remote repository (GitHub)."""
+        base_url = "https://raw.githubusercontent.com/autiwire/pip2sysdep/main/data"
+        url = f"{base_url}/{self.os_distro}-{self.os_version}.toml"
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.read()
+                return tomllib.loads(data.decode("utf-8"))
+        except Exception as e:
+            raise FileNotFoundError(f"Could not fetch mapping file from {url}: {e}")
 
     def _get_content(self) -> Dict:
         """Get content with thread safety."""
         with self._content_lock:
             if self._content is None:
-                if self.source == Source.LOCAL:
+                if self.source == SysDepSource.LOCAL:
                     self._content = self._get_local_content()
-                elif self.source == Source.REPO:
+                elif self.source == SysDepSource.REPO:
                     self._content = self._get_repo_content()
         return self._content
 
@@ -102,14 +107,12 @@ class Pip2SysDep:
         flat = [x for x in result if not (x in seen or seen.add(x))]
         return {'all': flat}
 
-    def convert_list(self, pip_packages: List[str], dependency_types: Optional[List[DependencyType]] = None) -> Dict[str, list]:
+    def convert_list(self, pip_packages: List[str]) -> Dict[str, list]:
         """
         Convert a list of pip requirements to their system dependencies.
 
         Args:
             pip_packages (List[str]): List of pip package names to convert
-            dependency_types (List[DependencyType], optional): List of dependency types to include.
-                If None, all dependency types are included.
 
         Returns:
             Dict[str, list]: Dictionary mapping dependency types to sets of unique system packages, and 'all' to a deduped, order-preserving list
@@ -134,35 +137,39 @@ class Pip2SysDep:
         out['all'] = all_flat
         return out
 
-    def get_install_command(self, dependencies: Dict[str, Set[str]]) -> str:
+    def get_install_command(self, dependencies: Dict[str, Set[str]], command: str = 'install') -> str:
         """
-        Generate the package manager install command for the dependencies.
+        Generate the package manager command for the dependencies.
 
         Args:
             dependencies (Dict[str, Set[str]]): Dictionary of dependencies by type
+            command (str): Which command to use from [__meta__.commands] (e.g. 'install', 'update'). Default is 'install'.
 
         Returns:
-            str: The package manager install command
+            str: The package manager command
         """
         content = self._get_content()
         meta = content.get("__meta__", {})
-        install_cmd = meta.get("install_command", "apt install -y")
-        
+        # Prefer [__meta__.commands] table, fallback to old install_command key for backward compatibility
+        commands = meta.get('commands', {})
+        if command == 'install':
+            install_cmd = commands.get('install') or meta.get('install_command', 'apt install -y')
+        else:
+            install_cmd = commands.get(command)
+            if not install_cmd:
+                raise ValueError(f"No command '{command}' found in [__meta__.commands]")
         # Interpolate package manager command
         if "${package_manager}" in install_cmd:
             package_manager = meta.get("package_manager", "apt")
             install_cmd = Template(install_cmd).substitute(package_manager=package_manager)
-        
         # Flatten all dependencies into a single list
         all_deps = []
         for deps in dependencies.values():
             all_deps.extend(deps)
-        
         # Join dependencies with spaces
         deps_str = " ".join(sorted(set(all_deps)))
-        
         # Return full command
-        return f"{install_cmd} {deps_str}"
+        return f"{install_cmd} {deps_str}" if deps_str else install_cmd
 
     def _get_current_os_info(self) -> tuple[Optional[str], Optional[str]]:
         """Get current OS distribution and version."""
