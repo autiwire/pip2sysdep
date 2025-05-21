@@ -123,3 +123,5 @@ MIT License. See [LICENSE](LICENSE) for details.
 ## About
 
 This project is maintained by [AutiWire GmbH](https://autiwire.de).
+
+Copyright (c) 2024 AutiWire GmbH
